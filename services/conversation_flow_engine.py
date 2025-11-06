@@ -328,6 +328,8 @@ Respond with ONLY the JSON."""
             model=self.deployment,
             messages=[{"role": "user", "content": validation_prompt}],
             temperature=0.1,
+            max_tokens=500,  # Validation responses should be short
+            timeout=30,  # 30 second timeout for validation
             response_format={"type": "json_object"}
         )
 
