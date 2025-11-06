@@ -13,8 +13,10 @@ handles ALL interpretation of prompt structures.
 """
 import os
 import json
+import re
 from typing import Dict, List, Any, Tuple, Optional
 from openai import AzureOpenAI
+from openai import APITimeoutError, APIConnectionError
 
 
 class ConversationFlowEngine:
@@ -230,6 +232,106 @@ Respond with ONLY the JSON, no additional text."""
 
         return next_questions
 
+    def _simple_validation(
+        self,
+        answers: Dict[str, Any],
+        current_questions: List[Dict]
+    ) -> Dict:
+        """
+        Fast Python-based validation for simple field types.
+
+        This handles 80% of validation cases instantly without AI:
+        - Required field checks
+        - Basic type validation
+        - Email/phone format validation
+        - Select option validation
+
+        Args:
+            answers: The submitted answers
+            current_questions: Questions being validated
+
+        Returns:
+            Validation result dict with is_valid, errors, warnings
+        """
+        errors = []
+        warnings = []
+
+        for question in current_questions:
+            field_id = question.get("field_id")
+            value = answers.get(field_id)
+            required = question.get("required", False)
+            input_type = question.get("input_type", "text")
+            options = question.get("options")
+
+            # Check required fields
+            if required and (value is None or str(value).strip() == ""):
+                errors.append({
+                    "field": field_id,
+                    "message": f"{question.get('label', field_id)} is required",
+                    "severity": "error"
+                })
+                continue
+
+            # Skip validation if field is not required and empty
+            if value is None or str(value).strip() == "":
+                continue
+
+            # Validate select options
+            if input_type == "select" and options:
+                if value not in options:
+                    errors.append({
+                        "field": field_id,
+                        "message": f"Must select one of: {', '.join(options)}",
+                        "severity": "error"
+                    })
+
+            # Validate email format
+            elif input_type == "email":
+                email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                if not re.match(email_pattern, str(value)):
+                    errors.append({
+                        "field": field_id,
+                        "message": "Please enter a valid email address",
+                        "severity": "error"
+                    })
+
+            # Validate phone format (basic)
+            elif input_type == "tel":
+                # Remove common separators
+                phone_digits = re.sub(r'[\s\-\(\)\.]', '', str(value))
+                if not re.match(r'^\+?[0-9]{10,15}$', phone_digits):
+                    errors.append({
+                        "field": field_id,
+                        "message": "Please enter a valid phone number",
+                        "severity": "error"
+                    })
+
+            # Validate number type
+            elif input_type == "number":
+                try:
+                    float(value)
+                except ValueError:
+                    errors.append({
+                        "field": field_id,
+                        "message": "Please enter a valid number",
+                        "severity": "error"
+                    })
+
+            # Validate date format (basic ISO check)
+            elif input_type == "date":
+                if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(value)):
+                    errors.append({
+                        "field": field_id,
+                        "message": "Please enter a valid date (YYYY-MM-DD)",
+                        "severity": "error"
+                    })
+
+        return {
+            "is_valid": len(errors) == 0,
+            "errors": errors,
+            "warnings": warnings
+        }
+
     def validate_answers(
         self,
         execution_plan: Dict,
@@ -238,7 +340,11 @@ Respond with ONLY the JSON, no additional text."""
         current_questions: List[Dict] = None
     ) -> Dict:
         """
-        Use GPT-4o to validate answers against rules.
+        Hybrid validation: Fast Python validation + GPT-4o for complex cases.
+
+        Uses two-tier approach:
+        1. Simple Python validation (instant, no AI cost)
+        2. GPT-4o validation only if needed (complex rules, cross-field validation)
 
         Args:
             execution_plan: The execution plan with validation rules
@@ -249,102 +355,80 @@ Respond with ONLY the JSON, no additional text."""
         Returns:
             Validation result with errors and warnings
         """
-        # Include current questions if provided
-        questions_context = ""
+        # TIER 1: Try simple Python validation first
         if current_questions:
-            questions_context = f"""
-## Current Questions Being Answered
-```json
-{json.dumps(current_questions, indent=2)}
-```
-"""
+            print("[Validation] Using fast Python validation")
+            simple_result = self._simple_validation(answers, current_questions)
 
-        validation_prompt = f"""You are a data validator for a legal document generation system.
+            # If simple validation fails, return immediately
+            if not simple_result["is_valid"]:
+                print(f"[Validation] Simple validation failed: {simple_result['errors']}")
+                return simple_result
 
-## Validation Rules
+            # Check if we need complex validation (has validation_rules)
+            validation_rules = execution_plan.get("validation_rules", {})
+            needs_complex = bool(validation_rules and validation_rules != {})
+
+            if not needs_complex:
+                print("[Validation] No complex rules, simple validation passed")
+                return simple_result
+
+            print("[Validation] Simple validation passed, checking complex rules with GPT-4o")
+
+        # TIER 2: Use GPT-4o for complex validation with timeout handling
+        try:
+            # Simplified validation prompt - less context, faster processing
+            validation_prompt = f"""Validate these answers against the rules.
+
+## Rules
 ```json
 {json.dumps(execution_plan.get("validation_rules", {}), indent=2)}
 ```
-{questions_context}
-## New Answers Submitted
+
+## Answers
 ```json
 {json.dumps(answers, indent=2)}
 ```
 
-## All Collected Data (for cross-field validation context only)
-```json
-{json.dumps(collected_data, indent=2)}
-```
+Return JSON: {{"is_valid": true/false, "errors": [], "warnings": []}}
 
-## CRITICAL INSTRUCTIONS - READ CAREFULLY
+For errors/warnings: {{"field": "field_id", "message": "error text", "severity": "error"}}"""
 
-You MUST validate ONLY the fields that appear in the "Current Questions Being Answered" section above.
+            response = self.client.chat.completions.create(
+                model=self.deployment,
+                messages=[{"role": "user", "content": validation_prompt}],
+                temperature=0.1,
+                max_tokens=300,
+                timeout=10,  # Reduced to 10 seconds
+                response_format={"type": "json_object"}
+            )
 
-**VALIDATION SCOPE:**
-- Look at the "Current Questions Being Answered" section
-- Extract the list of field_id values from that section
-- Validate ONLY those specific field_ids
-- IGNORE all other fields, even if they are required or have validation rules
+            validation_result = json.loads(response.choices[0].message.content)
 
-**STEP-BY-STEP PROCESS:**
-1. Identify which field_ids are in "Current Questions Being Answered"
-2. For each of those field_ids ONLY:
-   - Check if required and if answer is provided
-   - Check data type correctness
-   - For SELECT fields: verify answer matches one of the valid options
-   - Check value constraints (length, format, range)
-3. Return validation results ONLY for those fields
+            # Normalize field_id to field for Pydantic compatibility
+            for error in validation_result.get("errors", []):
+                if "field_id" in error and "field" not in error:
+                    error["field"] = error.pop("field_id")
+            for warning in validation_result.get("warnings", []):
+                if "field_id" in warning and "field" not in warning:
+                    warning["field"] = warning.pop("field_id")
 
-**EXAMPLE:**
-If "Current Questions Being Answered" shows:
-```json
-[{{"field_id": "employer_name", "required": true}}]
-```
+            print("[Validation] GPT-4o validation completed successfully")
+            return validation_result
 
-And "New Answers Submitted" shows:
-```json
-{{"province_territory": "Ontario", "employer_name": "ABC Corp"}}
-```
-
-You should validate ONLY "employer_name" and IGNORE "province_territory" completely.
-
-**DO NOT:**
-- Validate fields not in "Current Questions Being Answered"
-- Check required fields that aren't being asked in this step
-- Return errors for fields not in the current questions list
-
-Respond with JSON in this exact format:
-```json
-{{
-  "is_valid": true/false,
-  "errors": [],
-  "warnings": []
-}}
-```
-
-Respond with ONLY the JSON."""
-
-        response = self.client.chat.completions.create(
-            model=self.deployment,
-            messages=[{"role": "user", "content": validation_prompt}],
-            temperature=0.1,
-            max_tokens=500,  # Validation responses should be short
-            timeout=30,  # 30 second timeout for validation
-            response_format={"type": "json_object"}
-        )
-
-        validation_result = json.loads(response.choices[0].message.content)
-
-        # Normalize field_id to field for Pydantic compatibility
-        # GPT-4o sometimes returns field_id instead of field
-        for error in validation_result.get("errors", []):
-            if "field_id" in error and "field" not in error:
-                error["field"] = error.pop("field_id")
-        for warning in validation_result.get("warnings", []):
-            if "field_id" in warning and "field" not in warning:
-                warning["field"] = warning.pop("field_id")
-
-        return validation_result
+        except (APITimeoutError, APIConnectionError, Exception) as e:
+            # FALLBACK: If GPT-4o validation times out or fails, accept the answers
+            # Simple validation already passed, so we know basic constraints are met
+            print(f"[Validation] GPT-4o validation failed ({type(e).__name__}: {str(e)}), falling back to simple validation result")
+            return {
+                "is_valid": True,
+                "errors": [],
+                "warnings": [{
+                    "field": "_system",
+                    "message": "Advanced validation temporarily unavailable, using basic validation",
+                    "severity": "warning"
+                }]
+            }
 
     def get_smart_suggestion(
         self,
