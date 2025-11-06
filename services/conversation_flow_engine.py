@@ -246,6 +246,9 @@ Respond with ONLY the JSON, no additional text."""
         - Email/phone format validation
         - Select option validation
 
+        IMPORTANT: Only validates fields that are actually in the answers dict.
+        Does NOT validate fields that weren't submitted.
+
         Args:
             answers: The submitted answers
             current_questions: Questions being validated
@@ -258,6 +261,12 @@ Respond with ONLY the JSON, no additional text."""
 
         for question in current_questions:
             field_id = question.get("field_id")
+
+            # CRITICAL: Only validate fields that were actually submitted
+            # Skip fields that aren't in the answers dict
+            if field_id not in answers:
+                continue
+
             value = answers.get(field_id)
             required = question.get("required", False)
             input_type = question.get("input_type", "text")
@@ -272,7 +281,7 @@ Respond with ONLY the JSON, no additional text."""
                 })
                 continue
 
-            # Skip validation if field is not required and empty
+            # Skip validation if field value is empty
             if value is None or str(value).strip() == "":
                 continue
 
