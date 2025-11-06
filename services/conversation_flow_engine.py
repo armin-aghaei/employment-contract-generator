@@ -387,21 +387,25 @@ Respond with ONLY the JSON, no additional text."""
         # TIER 2: Use GPT-4o for complex validation with timeout handling
         try:
             # Simplified validation prompt - less context, faster processing
-            validation_prompt = f"""Validate these answers against the rules.
+            validation_prompt = f"""Validate ONLY the fields in the answers against the rules.
 
-## Rules
-```json
-{json.dumps(execution_plan.get("validation_rules", {}), indent=2)}
-```
+CRITICAL: Only validate fields that appear in the answers JSON below. Do NOT validate other fields.
 
-## Answers
+## Answers to Validate
 ```json
 {json.dumps(answers, indent=2)}
 ```
 
+## Validation Rules (apply only to fields in answers)
+```json
+{json.dumps(execution_plan.get("validation_rules", {}), indent=2)}
+```
+
 Return JSON: {{"is_valid": true/false, "errors": [], "warnings": []}}
 
-For errors/warnings: {{"field": "field_id", "message": "error text", "severity": "error"}}"""
+For errors/warnings: {{"field": "field_id", "message": "error text", "severity": "error"}}
+
+Remember: ONLY return errors for fields that are in the answers JSON above."""
 
             response = self.client.chat.completions.create(
                 model=self.deployment,
