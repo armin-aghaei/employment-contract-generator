@@ -234,7 +234,8 @@ Respond with ONLY the JSON, no additional text."""
         self,
         execution_plan: Dict,
         answers: Dict[str, Any],
-        collected_data: Dict[str, Any]
+        collected_data: Dict[str, Any],
+        current_questions: List[Dict] = None
     ) -> Dict:
         """
         Use GPT-4o to validate answers against rules.
@@ -243,17 +244,28 @@ Respond with ONLY the JSON, no additional text."""
             execution_plan: The execution plan with validation rules
             answers: The newly submitted answers
             collected_data: All previously collected data
+            current_questions: The questions that were asked (with valid options)
 
         Returns:
             Validation result with errors and warnings
         """
+        # Include current questions if provided
+        questions_context = ""
+        if current_questions:
+            questions_context = f"""
+## Current Questions Being Answered
+```json
+{json.dumps(current_questions, indent=2)}
+```
+"""
+
         validation_prompt = f"""You are a data validator for a legal document generation system.
 
 ## Validation Rules
 ```json
 {json.dumps(execution_plan.get("validation_rules", {}), indent=2)}
 ```
-
+{questions_context}
 ## New Answers
 ```json
 {json.dumps(answers, indent=2)}
@@ -268,9 +280,12 @@ Respond with ONLY the JSON, no additional text."""
 Validate the new answers against the rules. Check:
 1. Required fields are provided and not empty
 2. Data types are correct
-3. Values meet constraints (length, format, range, etc.)
-4. Cross-field validations pass (e.g., end date after start date)
-5. Legal requirements are met (e.g., minimum notice periods)
+3. For SELECT fields: verify the answer matches one of the valid options listed in "Current Questions Being Answered"
+4. Values meet constraints (length, format, range, etc.)
+5. Cross-field validations pass (e.g., end date after start date)
+6. Legal requirements are met (e.g., minimum notice periods)
+
+IMPORTANT: If a field has "options" in the Current Questions, the answer MUST be one of those exact values.
 
 Respond with JSON:
 ```json

@@ -274,12 +274,21 @@ async def submit_answers(
             detail="Session execution plan not found. Please start a new session."
         )
 
+    # Get current questions being answered (for validation context)
+    current_questions = []
+    for field_id in request.answers.keys():
+        for q in session.execution_plan.get("question_sequence", []):
+            if q.get("question_id") == field_id:
+                current_questions.append(q)
+                break
+
     # Validate the submitted answers using GPT-4o
     try:
         validation_result = conversation_engine.validate_answers(
             execution_plan=session.execution_plan,
             answers=request.answers,
-            collected_data=session.collected_data
+            collected_data=session.collected_data,
+            current_questions=current_questions
         )
     except Exception as e:
         raise HTTPException(
