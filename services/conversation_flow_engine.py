@@ -277,15 +277,21 @@ Respond with ONLY the JSON, no additional text."""
 ```
 
 ## Your Task
-Validate the new answers against the rules. Check:
-1. Required fields are provided and not empty
-2. Data types are correct
-3. For SELECT fields: verify the answer matches one of the valid options listed in "Current Questions Being Answered"
-4. Values meet constraints (length, format, range, etc.)
-5. Cross-field validations pass (e.g., end date after start date)
-6. Legal requirements are met (e.g., minimum notice periods)
+Validate ONLY the answers for fields listed in "Current Questions Being Answered".
 
-IMPORTANT: If a field has "options" in the Current Questions, the answer MUST be one of those exact values.
+CRITICAL: Do NOT validate fields that are not in the "Current Questions Being Answered" section.
+Only validate the specific fields that were asked in this step.
+
+For each field in "Current Questions Being Answered", check:
+1. If the field is marked as "required": true, verify the answer is provided and not empty
+2. Data types are correct
+3. For SELECT fields: verify the answer matches one of the valid options listed
+4. Values meet constraints (length, format, range, etc.)
+5. Cross-field validations pass ONLY if both fields are in the current questions (e.g., end date after start date)
+
+IMPORTANT:
+- If a field has "options" in the Current Questions, the answer MUST be one of those exact values.
+- Ignore any required fields that are NOT in the "Current Questions Being Answered" section.
 
 Respond with JSON:
 ```json
