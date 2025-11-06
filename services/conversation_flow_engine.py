@@ -374,15 +374,22 @@ Respond with ONLY the JSON, no additional text."""
                 print(f"[Validation] Simple validation failed: {simple_result['errors']}")
                 return simple_result
 
-            # Check if we need complex validation (has validation_rules)
-            validation_rules = execution_plan.get("validation_rules", {})
-            needs_complex = bool(validation_rules and validation_rules != {})
+            # TEMPORARY FIX: Disable GPT-4o validation entirely
+            # GPT-4o keeps validating ALL fields despite explicit scope instructions
+            # This causes validation errors for fields not yet submitted
+            # Simple Python validation is sufficient for now
+            print("[Validation] Simple validation passed, GPT-4o disabled (scope issues)")
+            return simple_result
 
-            if not needs_complex:
-                print("[Validation] No complex rules, simple validation passed")
-                return simple_result
-
-            print("[Validation] Simple validation passed, checking complex rules with GPT-4o")
+            # TODO: Re-enable GPT-4o validation once we can guarantee field scope
+            # validation_rules = execution_plan.get("validation_rules", {})
+            # needs_complex = bool(validation_rules and validation_rules != {})
+            #
+            # if not needs_complex:
+            #     print("[Validation] No complex rules, simple validation passed")
+            #     return simple_result
+            #
+            # print("[Validation] Simple validation passed, checking complex rules with GPT-4o")
 
         # TIER 2: Use GPT-4o for complex validation with timeout handling
         try:
