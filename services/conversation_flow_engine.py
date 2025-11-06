@@ -332,6 +332,16 @@ Respond with ONLY the JSON."""
         )
 
         validation_result = json.loads(response.choices[0].message.content)
+
+        # Normalize field_id to field for Pydantic compatibility
+        # GPT-4o sometimes returns field_id instead of field
+        for error in validation_result.get("errors", []):
+            if "field_id" in error and "field" not in error:
+                error["field"] = error.pop("field_id")
+        for warning in validation_result.get("warnings", []):
+            if "field_id" in warning and "field" not in warning:
+                warning["field"] = warning.pop("field_id")
+
         return validation_result
 
     def get_smart_suggestion(
