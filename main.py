@@ -308,14 +308,23 @@ async def submit_answers(
 
     # If validation failed, return errors without saving
     if not validation_result.get("is_valid", False):
-        errors = [
-            ValidationError(**error)
-            for error in validation_result.get("errors", [])
-        ]
-        warnings = [
-            ValidationError(**warning)
-            for warning in validation_result.get("warnings", [])
-        ]
+        try:
+            errors = [
+                ValidationError(**error)
+                for error in validation_result.get("errors", [])
+            ]
+            warnings = [
+                ValidationError(**warning)
+                for warning in validation_result.get("warnings", [])
+            ]
+        except Exception as e:
+            # Log the validation result that failed to parse
+            print(f"[ERROR] Failed to create ValidationError objects: {str(e)}")
+            print(f"[ERROR] Validation result: {validation_result}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to parse validation errors: {str(e)}"
+            )
 
         # Calculate current progress (no change)
         progress = conversation_engine.calculate_progress(
