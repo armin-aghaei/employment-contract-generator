@@ -275,12 +275,22 @@ async def submit_answers(
         )
 
     # Get current questions being answered (for validation context)
-    current_questions = []
-    for field_id in request.answers.keys():
-        for q in session.execution_plan.get("question_sequence", []):
-            if q.get("question_id") == field_id:
-                current_questions.append(q)
-                break
+    # These are the questions that were shown to the user in the current step
+    try:
+        current_questions = conversation_engine.get_next_questions(
+            execution_plan=session.execution_plan,
+            answered_question_ids=session.answered_question_ids,
+            collected_data=session.collected_data,
+            num_questions=1
+        )
+    except Exception as e:
+        # Fallback: try to get questions from answer keys
+        current_questions = []
+        for field_id in request.answers.keys():
+            for q in session.execution_plan.get("question_sequence", []):
+                if q.get("question_id") == field_id:
+                    current_questions.append(q)
+                    break
 
     # Validate the submitted answers using GPT-4o
     try:
