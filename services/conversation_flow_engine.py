@@ -266,51 +266,59 @@ Respond with ONLY the JSON, no additional text."""
 {json.dumps(execution_plan.get("validation_rules", {}), indent=2)}
 ```
 {questions_context}
-## New Answers
+## New Answers Submitted
 ```json
 {json.dumps(answers, indent=2)}
 ```
 
-## All Collected Data (for cross-field validation)
+## All Collected Data (for cross-field validation context only)
 ```json
 {json.dumps(collected_data, indent=2)}
 ```
 
-## Your Task
-Validate ONLY the answers for fields listed in "Current Questions Being Answered".
+## CRITICAL INSTRUCTIONS - READ CAREFULLY
 
-CRITICAL: Do NOT validate fields that are not in the "Current Questions Being Answered" section.
-Only validate the specific fields that were asked in this step.
+You MUST validate ONLY the fields that appear in the "Current Questions Being Answered" section above.
 
-For each field in "Current Questions Being Answered", check:
-1. If the field is marked as "required": true, verify the answer is provided and not empty
-2. Data types are correct
-3. For SELECT fields: verify the answer matches one of the valid options listed
-4. Values meet constraints (length, format, range, etc.)
-5. Cross-field validations pass ONLY if both fields are in the current questions (e.g., end date after start date)
+**VALIDATION SCOPE:**
+- Look at the "Current Questions Being Answered" section
+- Extract the list of field_id values from that section
+- Validate ONLY those specific field_ids
+- IGNORE all other fields, even if they are required or have validation rules
 
-IMPORTANT:
-- If a field has "options" in the Current Questions, the answer MUST be one of those exact values.
-- Ignore any required fields that are NOT in the "Current Questions Being Answered" section.
+**STEP-BY-STEP PROCESS:**
+1. Identify which field_ids are in "Current Questions Being Answered"
+2. For each of those field_ids ONLY:
+   - Check if required and if answer is provided
+   - Check data type correctness
+   - For SELECT fields: verify answer matches one of the valid options
+   - Check value constraints (length, format, range)
+3. Return validation results ONLY for those fields
 
-Respond with JSON:
+**EXAMPLE:**
+If "Current Questions Being Answered" shows:
+```json
+[{{"field_id": "employer_name", "required": true}}]
+```
+
+And "New Answers Submitted" shows:
+```json
+{{"province_territory": "Ontario", "employer_name": "ABC Corp"}}
+```
+
+You should validate ONLY "employer_name" and IGNORE "province_territory" completely.
+
+**DO NOT:**
+- Validate fields not in "Current Questions Being Answered"
+- Check required fields that aren't being asked in this step
+- Return errors for fields not in the current questions list
+
+Respond with JSON in this exact format:
 ```json
 {{
   "is_valid": true/false,
-  "errors": [
-    {{
-      "field": "field_id",
-      "message": "Clear error message for the user",
-      "severity": "error"
-    }}
-  ],
-  "warnings": [
-    {{
-      "field": "field_id",
-      "message": "Warning message (non-blocking)",
-      "severity": "warning"
-    }}
-  ]
+  "errors": [],
+  "warnings": []
 }}
 ```
 
