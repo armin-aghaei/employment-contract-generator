@@ -92,3 +92,4 @@ curl -X POST http://localhost:8000/sessions/start \
 
 Proprietary - All Rights Reserved
 
+# Legal Document Automation Platform v1.0.0
