@@ -3,6 +3,8 @@ Legal Document Automation Platform - Main Application
 
 A document-agnostic platform that uses Azure OpenAI GPT-4o to generate
 customized legal documents through conversational AI.
+
+Version: 1.0.0
 """
 import os
 from datetime import datetime
