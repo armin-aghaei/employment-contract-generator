@@ -54,9 +54,10 @@ class ConversationFlowEngine:
         Returns:
             Execution plan with standardized structure
         """
-        analysis_prompt = f"""You are a conversation flow analyzer for a legal document generation platform.
+        analysis_prompt = f"""You are a DIRECT CONVERTER for a legal document generation platform.
 
-Given a prompt configuration JSON (which may have ANY structure), analyze it and create a standardized execution plan.
+CRITICAL: Your job is to FAITHFULLY CONVERT the provided template configuration into a standardized execution plan.
+You are NOT an analyzer or summarizer - you are a CONVERTER that preserves EVERY question EXACTLY as defined.
 
 ## Prompt Configuration
 ```json
@@ -68,18 +69,67 @@ Given a prompt configuration JSON (which may have ANY structure), analyze it and
 {json.dumps(template_json, indent=2)}
 ```
 
-## Your Task
-Analyze the prompt configuration and extract:
+## CRITICAL CONVERSION RULES - READ CAREFULLY:
 
-1. **Structure Analysis**: Understand how questions are organized (phases/sections, flat list, hierarchical, custom)
+1. **COMPLETE FIDELITY**: You MUST include EVERY SINGLE question defined in the configuration
+   - Do NOT skip questions
+   - Do NOT simplify questions
+   - Do NOT combine questions
+   - Do NOT create new questions not in the template
+   - Use the EXACT text from the "prompt" field as the question_text
 
-2. **Question Sequence**: Extract ALL questions in the order they should be asked. Convert complex question types into simple web form types.
+2. **PRESERVE STRUCTURE**: Follow the exact phase and section order defined in the template
+   - Process phases in numerical order (Phase 1, Phase 2, etc.)
+   - Within each phase, process sections in the order defined
+   - Within each section, process questions in the order defined
+   - Assign sequence_number sequentially (1, 2, 3, ...) following this order
 
-3. **Conditional Logic**: Identify any conditional/followUp questions and their triggers
+3. **QUESTION CONVERSION**: Convert each question exactly as specified:
+   - question_id: Use the "id" field from the template
+   - question_text: Use the exact "prompt" field text
+   - input_type: Use the "type" field (convert "address" and "object" types - see below)
+   - options: Use the exact "options" array if present
+   - required: Use the section's "required" or question's requirement
+   - help_text: Combine "guidance" + "legal_note" if both present
+   - validation_rules: Extract from "validation" field
 
-4. **Validation Rules**: Extract validation requirements
+4. **HANDLE COMPLEX TYPES**:
+   - For type="address" with fields like ["street", "city", "province", "postal_code"]:
+     Create SEPARATE questions for each field (e.g., employer_address_street, employer_address_city)
+   - For type="object" with multiple fields:
+     Create SEPARATE questions for each property
+   - Use text/select/date/number/email/tel for simple types
 
-5. **Field Mappings**: Map question IDs to template placeholder fields
+5. **CONDITIONAL LOGIC (followUp)**:
+   - When a question has a "followUp" field, extract ALL questions from followUp.questions array
+   - Add them to conditional_questions array
+   - Set triggered_by_field to the parent question's ID
+   - Set trigger_condition based on the followUp condition
+
+6. **OPTIONAL SECTIONS (required: false)**:
+   - If a section is marked required: false, it's typically controlled by a yes/no question
+   - The first question in an optional section is usually "Include X?" or similar
+   - All subsequent questions in that section should be conditional on the first question's answer
+
+7. **READ THE SYSTEMPROMPT**: The prompt configuration may include a "systemPrompt" field with instructions
+   - This field tells you the INTENT and RULES for how to process the template
+   - If it says "MUST use the EXACT questions" - you MUST include every question
+   - If it says "MUST follow the EXACT sequence" - you MUST preserve the order
+   - If it says "MUST NOT skip any questions" - you MUST include all questions
+   - Treat the systemPrompt as your PRIMARY directive
+
+## CONVERSION PROCESS:
+
+Step 1: Read the systemPrompt (if present) to understand the template author's intent
+Step 2: Identify the structure (look for "phases", "sections", "questions" arrays)
+Step 3: Iterate through phases → sections → questions in order
+Step 4: For EACH question found, create an entry in question_sequence
+Step 5: For questions with followUp logic, add to conditional_questions
+Step 6: Extract validation rules from each question
+Step 7: Generate a friendly welcome_message
+
+REMEMBER: Your output should have the SAME NUMBER of questions as the input template!
+If the template has 50 questions, your execution plan should have 50 questions!
 
 Respond with JSON in this EXACT format (this is critical):
 ```json
