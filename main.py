@@ -348,7 +348,10 @@ async def submit_answers(
 
     # Track which questions were answered
     answered_field_ids = list(request.answers.keys())
+    print(f"[DEBUG main.py] Adding to answered_question_ids: {answered_field_ids}")
+    print(f"[DEBUG main.py] Before update: {session.answered_question_ids}")
     session.answered_question_ids.extend(answered_field_ids)
+    print(f"[DEBUG main.py] After update: {session.answered_question_ids}")
 
     # Get next questions
     try:

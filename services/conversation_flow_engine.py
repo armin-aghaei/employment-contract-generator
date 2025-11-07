@@ -204,6 +204,12 @@ Respond with ONLY the JSON, no additional text."""
         question_sequence = execution_plan.get("question_sequence", [])
         conditional_questions = execution_plan.get("conditional_questions", [])
 
+        # DEBUG: Log what we're checking
+        print(f"[DEBUG get_next_questions] answered_question_ids: {answered_question_ids}")
+        print(f"[DEBUG get_next_questions] Total questions in sequence: {len(question_sequence)}")
+        if question_sequence:
+            print(f"[DEBUG get_next_questions] First question question_id: {question_sequence[0].get('question_id')}")
+
         next_questions = []
 
         # First, check for triggered conditional questions
@@ -220,16 +226,24 @@ Respond with ONLY the JSON, no additional text."""
 
         # Then, get next unanswered sequential questions
         for q in question_sequence:
-            if q["question_id"] not in answered_question_ids:
+            question_id = q["question_id"]
+            is_answered = question_id in answered_question_ids
+
+            print(f"[DEBUG] Checking question_id '{question_id}': answered={is_answered}")
+
+            if not is_answered:
                 # Check dependencies
                 depends_on = q.get("depends_on")
                 if depends_on and depends_on not in answered_question_ids:
+                    print(f"[DEBUG] Skipping '{question_id}' - dependency '{depends_on}' not met")
                     continue  # Skip this question, dependency not met
 
+                print(f"[DEBUG] Adding '{question_id}' to next_questions")
                 next_questions.append(self._format_question_for_frontend(q))
                 if len(next_questions) >= num_questions:
                     break
 
+        print(f"[DEBUG get_next_questions] Returning {len(next_questions)} questions")
         return next_questions
 
     def _simple_validation(
