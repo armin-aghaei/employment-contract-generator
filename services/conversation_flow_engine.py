@@ -148,13 +148,23 @@ IMPORTANT RULES:
 - For conditional questions, clearly specify the trigger condition
 - Make the welcome_message friendly and encouraging
 
-CRITICAL - HANDLING PHASES:
+CRITICAL - HANDLING PHASES AND OPTIONAL CLAUSES:
 - If the prompt configuration has a "Phase 0" or similar phase for "Optional Clause Selection", these questions MUST appear FIRST in the question_sequence
-- These are "yes/no" questions asking whether to include optional contract clauses (e.g., "Include probation period?", "Include confidentiality clause?")
+- These are "yes/no" questions asking whether to include optional contract clauses (e.g., "Include probation period?", "Include work location?", "Include benefits?")
 - Place ALL Phase 0 questions at the beginning of question_sequence (sequence_number 1, 2, 3, etc.)
 - Then follow with other phases in order (Phase 1, Phase 2, etc.)
-- The detailed questions for each optional clause should be in conditional_questions, triggered by the yes/no answer from Phase 0
-- Example: If user answers "yes" to "Include probation period?", then ask probation-related detail questions
+
+CRITICAL - CONDITIONAL FOLLOW-UP QUESTIONS (VERY IMPORTANT):
+- For EVERY "yes/no" question about including an optional clause, you MUST create corresponding conditional questions to collect the actual details
+- Example 1: If you ask "Include work location?", you MUST create a conditional question asking "What is the work location?" (input_type: text) that triggers when answer is "yes"
+- Example 2: If you ask "Include working hours?", you MUST create a conditional question asking "What are the working hours?" (input_type: text) when answer is "yes"
+- Example 3: If you ask "Include benefits?", you MUST create a conditional question asking "What benefits are provided?" (input_type: text) when answer is "yes"
+- Example 4: If you ask "Include probation period?", you MUST create conditional questions for probation duration and terms when answer is "yes"
+- The conditional questions should be in the conditional_questions array with:
+  - triggered_by_field: the question_id of the yes/no question (e.g., "include_work_location")
+  - trigger_condition: {{"include_work_location": "yes"}} or similar positive response
+- DO NOT skip the detail questions - every optional clause YES/NO question REQUIRES its corresponding detail question(s) in conditional_questions!
+- Without the detail questions, we cannot populate the template placeholders!
 
 Respond with ONLY the JSON, no additional text."""
 
