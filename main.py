@@ -211,7 +211,8 @@ async def start_session(
     progress = conversation_engine.calculate_progress(
         execution_plan=execution_plan,
         answered_question_ids=[],
-        current_question=first_questions[0] if first_questions else None
+        current_question=first_questions[0] if first_questions else None,
+        collected_data={}
     )
 
     # Create session in database
@@ -330,7 +331,8 @@ async def submit_answers(
         # Calculate current progress (no change)
         progress = conversation_engine.calculate_progress(
             execution_plan=session.execution_plan,
-            answered_question_ids=session.answered_question_ids
+            answered_question_ids=session.answered_question_ids,
+            collected_data=session.collected_data
         )
 
         return SubmitAnswersResponse(
@@ -400,7 +402,8 @@ async def submit_answers(
     progress = conversation_engine.calculate_progress(
         execution_plan=session.execution_plan,
         answered_question_ids=session.answered_question_ids,
-        current_question=next_questions[0] if next_questions else None
+        current_question=next_questions[0] if next_questions else None,
+        collected_data=session.collected_data
     )
 
     # Commit changes to database

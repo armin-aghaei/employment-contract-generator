@@ -154,17 +154,40 @@ CRITICAL - HANDLING PHASES AND OPTIONAL CLAUSES:
 - Place ALL Phase 0 questions at the beginning of question_sequence (sequence_number 1, 2, 3, etc.)
 - Then follow with other phases in order (Phase 1, Phase 2, etc.)
 
-CRITICAL - CONDITIONAL FOLLOW-UP QUESTIONS (VERY IMPORTANT):
+CRITICAL - CONDITIONAL FOLLOW-UP QUESTIONS (EXTREMELY IMPORTANT):
 - For EVERY "yes/no" question about including an optional clause, you MUST create corresponding conditional questions to collect the actual details
-- Example 1: If you ask "Include work location?", you MUST create a conditional question asking "What is the work location?" (input_type: text) that triggers when answer is "yes"
-- Example 2: If you ask "Include working hours?", you MUST create a conditional question asking "What are the working hours?" (input_type: text) when answer is "yes"
-- Example 3: If you ask "Include benefits?", you MUST create a conditional question asking "What benefits are provided?" (input_type: text) when answer is "yes"
-- Example 4: If you ask "Include probation period?", you MUST create conditional questions for probation duration and terms when answer is "yes"
-- The conditional questions should be in the conditional_questions array with:
-  - triggered_by_field: the question_id of the yes/no question (e.g., "include_work_location")
-  - trigger_condition: {{"include_work_location": "yes"}} or similar positive response
-- DO NOT skip the detail questions - every optional clause YES/NO question REQUIRES its corresponding detail question(s) in conditional_questions!
-- Without the detail questions, we cannot populate the template placeholders!
+- This is MANDATORY for ALL optional clauses without exception
+- Examples (you MUST follow this pattern for ALL optional clauses):
+
+  Example 1 - Work Location:
+  - Yes/No question: "Include work location?" (field_id: "include_work_location")
+  - Conditional detail question: "What is the work location?" (field_id: "work_location", triggered_by: "include_work_location", condition: {{"include_work_location": "yes"}})
+
+  Example 2 - Working Hours:
+  - Yes/No question: "Include working hours?" (field_id: "include_working_hours")
+  - Conditional detail question: "What are the working hours?" (field_id: "working_hours", triggered_by: "include_working_hours", condition: {{"include_working_hours": "yes"}})
+
+  Example 3 - Benefits (VERY IMPORTANT):
+  - Yes/No question: "Include benefits?" (field_id: "include_benefits")
+  - Conditional detail question: "What benefits are provided?" (field_id: "benefits_description", triggered_by: "include_benefits", condition: {{"include_benefits": "yes"}})
+
+  Example 4 - Additional Compensation (VERY IMPORTANT):
+  - Yes/No question: "Include additional compensation?" (field_id: "include_additional_compensation")
+  - Conditional detail question: "What additional compensation is provided?" (field_id: "additional_compensation_details", triggered_by: "include_additional_compensation", condition: {{"include_additional_compensation": "yes"}})
+
+  Example 5 - Probation Period:
+  - Yes/No question: "Include probation period?" (field_id: "include_probation_period")
+  - Conditional detail questions:
+    * "What is the probation duration?" (field_id: "probation_duration")
+    * "What are the probation terms?" (field_id: "probation_terms")
+    Both triggered by "include_probation_period" with condition {{"include_probation_period": "yes"}}
+
+- The conditional questions MUST be in the conditional_questions array with:
+  - triggered_by_field: the question_id of the yes/no question
+  - trigger_condition: the exact answer that triggers this question (e.g., {{"include_work_location": "yes"}})
+
+- CRITICAL: DO NOT skip ANY detail questions - EVERY optional clause YES/NO question REQUIRES its corresponding detail question(s)!
+- Without the detail questions, we cannot populate the template placeholders and the contract will be incomplete!
 
 Respond with ONLY the JSON, no additional text."""
 
@@ -595,23 +618,51 @@ Respond with ONLY the JSON."""
         self,
         execution_plan: Dict,
         answered_question_ids: List[str],
-        current_question: Optional[Dict] = None
+        current_question: Optional[Dict] = None,
+        collected_data: Optional[Dict] = None
     ) -> Dict:
         """
         Calculate progress information.
+
+        IMPORTANT: Dynamically calculates total steps including both:
+        - Base question_sequence questions
+        - Conditional questions that have been triggered based on user answers
 
         Args:
             execution_plan: The execution plan
             answered_question_ids: Questions answered so far
             current_question: The current question being asked
+            collected_data: User answers collected so far (for checking trigger conditions)
 
         Returns:
             Progress information dictionary
         """
         question_sequence = execution_plan.get("question_sequence", [])
-        total_questions = len(question_sequence)
-        answered_count = len(answered_question_ids)
+        conditional_questions = execution_plan.get("conditional_questions", [])
 
+        # Start with base questions
+        total_questions = len(question_sequence)
+
+        # Count triggered conditional questions
+        # A conditional question is triggered if its trigger condition is met
+        if collected_data is None:
+            collected_data = {}
+
+        for cond_q in conditional_questions:
+            trigger_field = cond_q.get("triggered_by_field")
+            trigger_condition = cond_q.get("trigger_condition", {})
+
+            # Check if trigger condition is met
+            if trigger_field and trigger_field in answered_question_ids:
+                # Check if the answer matches the trigger condition
+                for field, expected_value in trigger_condition.items():
+                    actual_value = collected_data.get(field)
+                    # Match if answer equals expected value (case-insensitive for strings)
+                    if actual_value and str(actual_value).lower() == str(expected_value).lower():
+                        total_questions += 1
+                        break
+
+        answered_count = len(answered_question_ids)
         percent_complete = (answered_count / total_questions * 100) if total_questions > 0 else 0
 
         # Determine phase name if available
