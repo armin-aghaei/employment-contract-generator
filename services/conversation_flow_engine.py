@@ -93,7 +93,7 @@ Respond with JSON in this EXACT format (this is critical):
   "question_sequence": [
     {{
       "sequence_number": 1,
-      "question_id": "unique_id",
+      "question_id": "field_name_in_snake_case",
       "question_text": "What is...",
       "input_type": "text|select|date|number|email|tel",
       "options": ["option1", "option2"] or null,
@@ -106,10 +106,14 @@ Respond with JSON in this EXACT format (this is critical):
       "shows_after_sequence": null
     }}
   ],
+
+  IMPORTANT: For question_id, use the actual field name in snake_case (e.g., "province_territory", "employer_name", "employee_full_name").
+  This identifier must be consistent and will be used to track which questions have been answered.
+  Do NOT use generic IDs like "Q001" or "question_1" - use descriptive field names that match the data being collected.
   "conditional_questions": [
     {{
-      "question_id": "conditional_question_id",
-      "triggered_by_field": "parent_field_id",
+      "question_id": "conditional_field_name_in_snake_case",
+      "triggered_by_field": "parent_field_name",
       "trigger_condition": {{"field": "value"}},
       "question_text": "What is...",
       "input_type": "text|select|date|number",
@@ -117,6 +121,8 @@ Respond with JSON in this EXACT format (this is critical):
       "maps_to_field": "TEMPLATE_FIELD_NAME"
     }}
   ],
+
+  IMPORTANT: For conditional questions, also use actual field names in snake_case for question_id (e.g., "probation_end_date", "commission_rate").
   "validation_rules": {{
     "field_validations": {{
       "field_id": ["min_length: 5", "max_length: 100"]
