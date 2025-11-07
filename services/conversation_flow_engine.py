@@ -148,6 +148,14 @@ IMPORTANT RULES:
 - For conditional questions, clearly specify the trigger condition
 - Make the welcome_message friendly and encouraging
 
+CRITICAL - HANDLING PHASES:
+- If the prompt configuration has a "Phase 0" or similar phase for "Optional Clause Selection", these questions MUST appear FIRST in the question_sequence
+- These are "yes/no" questions asking whether to include optional contract clauses (e.g., "Include probation period?", "Include confidentiality clause?")
+- Place ALL Phase 0 questions at the beginning of question_sequence (sequence_number 1, 2, 3, etc.)
+- Then follow with other phases in order (Phase 1, Phase 2, etc.)
+- The detailed questions for each optional clause should be in conditional_questions, triggered by the yes/no answer from Phase 0
+- Example: If user answers "yes" to "Include probation period?", then ask probation-related detail questions
+
 Respond with ONLY the JSON, no additional text."""
 
         response = self.client.chat.completions.create(
