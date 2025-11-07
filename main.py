@@ -14,6 +14,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session as DBSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from database import DatabaseClient, get_db
 from database.models import DocumentTemplate, Session, GeneratedDocument
@@ -345,6 +346,8 @@ async def submit_answers(
 
     # Validation passed - update session with new data
     session.collected_data.update(request.answers)
+    # CRITICAL: Mark JSONB column as modified
+    flag_modified(session, "collected_data")
 
     # Track which questions were answered
     answered_field_ids = list(request.answers.keys())
@@ -352,6 +355,10 @@ async def submit_answers(
     print(f"[DEBUG main.py] Before update: {session.answered_question_ids}")
     session.answered_question_ids.extend(answered_field_ids)
     print(f"[DEBUG main.py] After update: {session.answered_question_ids}")
+
+    # CRITICAL: Mark JSONB column as modified so SQLAlchemy saves it
+    # Without this, in-place mutations like .extend() are not detected!
+    flag_modified(session, "answered_question_ids")
 
     # Get next questions
     try:
