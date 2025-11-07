@@ -214,7 +214,9 @@ Respond with ONLY the JSON, no additional text."""
         print(f"[DEBUG get_next_questions] answered_question_ids: {answered_question_ids}")
         print(f"[DEBUG get_next_questions] Total questions in sequence: {len(question_sequence)}")
         if question_sequence:
-            print(f"[DEBUG get_next_questions] First question question_id: {question_sequence[0].get('question_id')}")
+            print(f"[DEBUG get_next_questions] First 5 questions:")
+            for i, q in enumerate(question_sequence[:5]):
+                print(f"  [{i}] question_id={q.get('question_id')}, depends_on={q.get('depends_on')}")
 
         next_questions = []
 

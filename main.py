@@ -412,6 +412,9 @@ async def submit_answers(
         for warning in validation_result.get("warnings", [])
     ]
 
+    print(f"[DEBUG main.py] Returning response with {len(next_questions)} next questions")
+    print(f"[DEBUG main.py] Session answered_question_ids final state: {session.answered_question_ids}")
+
     return SubmitAnswersResponse(
         session_id=session.session_id,
         validation_passed=True,
